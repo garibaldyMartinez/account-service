@@ -8,8 +8,9 @@ import java.util.Set;
 import jakarta.annotation.PostConstruct;
 import jakarta.json.Json;
 import jakarta.json.JsonObjectBuilder;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -22,31 +23,31 @@ import quarkus.model.Account;
 
 @Path("/accounts")
 public class AccountResource {
-	
-	@Provider                                                                 
-	  public static class ErrorMapper implements ExceptionMapper<Exception> {   
-	 
-	    @Override
-	    public Response toResponse(Exception exception) {                       
-	 
-	      int code = 500;
-	      if (exception instanceof WebApplicationException) {                   
-	         ((WebApplicationException) exception).getResponse().getStatus();
-	      }
-	 
-	      JsonObjectBuilder entityBuilder = Json.createObjectBuilder()          
-	          .add("exceptionType", exception.getClass().getName())
-	          .add("code", code);
-	 
-	      if (exception.getMessage() != null) {                                 
-	        entityBuilder.add("error", exception.getMessage());
-	      }
-	 
-	      return Response.status(code)                                          
-	          .entity(entityBuilder.build())
-	          .build();
-	    }
-	  }
+
+	@Provider
+	public static class ErrorMapper implements ExceptionMapper<Exception> {
+
+		@Override
+		public Response toResponse(Exception exception) {
+
+			int code = 500;
+			if (exception instanceof WebApplicationException webAplication) {
+		         code = webAplication.getResponse().getStatus();
+			}
+
+			JsonObjectBuilder entityBuilder = Json.createObjectBuilder()
+					.add("exceptionType", exception.getClass().getName())
+					.add("code", code);
+
+			if (exception.getMessage() != null) {
+				entityBuilder.add("error", exception.getMessage());
+			}
+
+			return Response.status(code)
+					.entity(entityBuilder.build())
+					.build();
+		}
+	}
 
 	Set<Account> accounts = new HashSet<>();
 
@@ -62,17 +63,28 @@ public class AccountResource {
 	public Set<Account> allAccount() {
 		return accounts;
 	}
-	
+
 	@GET
 	@Path("/{accountNumber}")
 	@Produces(MediaType.APPLICATION_JSON)
 	public Account getAccount(@PathParam("accountNumber") Long accountNumber) {
-		Optional<Account> response = accounts.stream()
-				.filter(acct -> acct.getAccountNumber().equals(accountNumber))
+		Optional<Account> response = accounts.stream().filter(acct -> acct.getAccountNumber().equals(accountNumber))
 				.findFirst();
-		
-		return response.orElseThrow(() 
-				-> new WebApplicationException("Account with id of " + accountNumber + " does not exist.", 404));
+
+		return response.orElseThrow(
+				() -> new WebApplicationException("Account with id of " + accountNumber + " does not exist.", 404));
 	}
+	
+	  @POST
+	  @Consumes(MediaType.APPLICATION_JSON)
+	  @Produces(MediaType.APPLICATION_JSON)
+	  public Response createAccount(Account account) {
+	    if (account.getAccountNumber() == null) {
+	      throw new WebApplicationException("No Account number specified.", 400);
+	    }
+	 
+	    accounts.add(account);
+	    return Response.status(201).entity(account).build(); 
+	  }
 
 }
